@@ -1,16 +1,19 @@
-import {contractAddress, toNano} from '@ton/core';
-import {Balances, CryptoWallet} from '../wrappers/CryptoWallet';
+import {address, Address, Cell, contractAddress, toNano} from '@ton/core';
+import {CryptoWallet} from '../wrappers/CryptoWallet';
 import { NetworkProvider } from '@ton/blueprint';
+import {contentToCell} from "../wrappers/CryptoWallet.compile";
 
 export async function run(provider: NetworkProvider) {
-    const randomInt = BigInt(Math.floor(Math.random() * 1000000));
-    const cryptoWallet = provider.open(await CryptoWallet.fromInit(randomInt));
+
+    const jettonMasterAddress = Address.parse('EQBxKeIJenM5hTzThZ4US5DQvKWNygIkS1UlEMqWBlFoaCnR');  // Replace with actual jetton master address
+    const userWallet:Address = address("0QC1GuMlMyN4bLe0xRAUulsvTgL1Z03nnTo34C4gdUpsrxfg");
 
 
+    const metaData = contentToCell({name: 'Havilla', symbol: "HVlA", maxsupply: BigInt(21000000)});
+    const tonJetton = provider.open(await CryptoWallet.fromInit(metaData, jettonMasterAddress));
 
 
-
-    await cryptoWallet.send(
+    await tonJetton.send(
         provider.sender(),
         {
             value: toNano('0.05'),
@@ -21,9 +24,8 @@ export async function run(provider: NetworkProvider) {
         }
     );
 
-    await provider.waitForDeploy(cryptoWallet.address);
+    await provider.waitForDeploy(tonJetton.address);
 
-    console.log("id", cryptoWallet.getUsdtBalance)
 
     // run methods on `cryptoWallet`
 }

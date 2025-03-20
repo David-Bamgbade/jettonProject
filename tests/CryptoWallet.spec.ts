@@ -1,7 +1,9 @@
 import { Blockchain, SandboxContract, TreasuryContract } from '@ton/sandbox';
-import {Builder, contractAddress, toNano} from '@ton/core';
-import {Balances, CryptoWallet} from '../wrappers/CryptoWallet';
+import {Address, Builder, Cell, contractAddress, toNano} from '@ton/core';
+import {CryptoWallet} from '../wrappers/CryptoWallet';
 import '@ton/test-utils';
+
+
 
 
 
@@ -11,16 +13,14 @@ describe('CryptoWallet', () => {
     let cryptoWallet: SandboxContract<CryptoWallet>;
 
 
+
     beforeEach(async () => {
         blockchain = await Blockchain.create();
 
-        const initState = await CryptoWallet.fromInit({
-            $$type: "Balances",
-            profitPerDay: BigInt(0),
-            usdtBalance: BigInt(1000),
-            tonBalance: BigInt(1000),
-            dailyProfitRate: BigInt(1)
-        });
+        const jettonMasterAddress = Address.parse('EQBxKeIJenM5hTzThZ4US5DQvKWNygIkS1UlEMqWBlFoaCnR');  // Replace with actual jetton master address
+        const jettonWalletCode = Cell.fromBoc('BOC_CODE_HERE')[0];  // Replace with the actual BOC code of the Jetton wallet
+
+        const initState = await CryptoWallet.fromInit(jettonWalletCode, jettonMasterAddress);
 
         cryptoWallet = blockchain.openContract(initState);
 
@@ -46,22 +46,27 @@ describe('CryptoWallet', () => {
         });
     });
 
+
     it('should deploy', async () => {
-        const initState = await CryptoWallet.fromInit({
-            $$type: "Balances",
-            profitPerDay: BigInt(0),
-            usdtBalance: BigInt(0),
-            tonBalance: BigInt(1000),
-            dailyProfitRate: BigInt(1)
-        });
+
+        const sendCrypto = await cryptoWallet.send(
+            deployer.getSender(),
+            {
+                value: BigInt(1000000000), // 1 TON in nanoTON
+            },
+            {
+                $$type: 'JattonTransferNotification',
+                queryId: BigInt(42),
+                amount: BigInt(5000000000),
+                sender: deployer.address,
+                forwardPayload: new Builder().endCell().beginParse(), // Empty payload
+            }
+        )
+
     });
 
-    it('should Get Ton Balance', async () => {
-        const expectedTonBalance = BigInt(0);
-        const tonBalance = await cryptoWallet.getTonBalance();
-        expect(tonBalance).toEqual(expectedTonBalance);
-        console.log(expectedTonBalance)
-        console.log(tonBalance)
+    it('', async () => {
+
     });
 
 

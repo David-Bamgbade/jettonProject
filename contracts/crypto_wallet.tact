@@ -1,6 +1,23 @@
 import "@stdlib/deploy";
 
-message(0x7362d09c) JettonTransferNotification {
+fun calculateJettonWalletAddress(
+ownerAddress: Address,
+jettonMasterAddress: Address,
+jettonWalletCode: Cell
+): Address {
+    let initData = JettonWalletData {
+    balance: 0,
+    ownerAddress,
+    jettonMasterAddress,
+    jettonWalletCode
+    };
+    return contractAddress (StateInit{
+    code: jettonWalletCode,
+    data: initData.toCell(),
+    });
+}
+
+message(0x7362d09c) JattonReceiveNotification {
     queryId: Int;
     amount: Int;
     sender: Address;
@@ -8,16 +25,14 @@ message(0x7362d09c) JettonTransferNotification {
 }
 
 message(0xf8a7ea5) JettonTransfer {
-    queryId: Int;
-    amount: Int;
+    queryId: Int as uint64;
+    amount: Int as coins;
     destination: Address;
-    responseDestintion: Address;
-    customPayload: Cell? = null;
+    responseDestination: Address;
+    customPayload: Cell? = null ;
     forwardTonAmount: Int;
     forwardPayload: Slice as remaining;
 }
-
-const usdtTransferGasFee: Int = ton ("0.05");
 
 struct JettonWalletData {
     balance: Int;
@@ -26,125 +41,57 @@ struct JettonWalletData {
     jettonWalletCode: Cell;
 }
 
-struct UsdtWalletData {
-    status: Int;
-    balance: Int;
-    ownerAddress: Address;
-    jettonMasterAddress: Address;
-}
-
-
-message Withdraw {
-    amount: Int;
-}
+const JettonTransferGasFee: Int = ton("0.05");
 
 contract CryptoWallet with Deployable {
-
-    myTonBalance: Int = 0;
-    myUsdtBalance: Int = 0;
     myJettonWalletAddress: Address;
+    myjettonTransferAmount: Int = 0;
+
+
+    fun myAddress(): Address {
+        return self.myJettonWalletAddress;
+    }
+
+    fun contractAddress(codeAndDataOfContract: StateInit): Address {
+        return self.myJettonWalletAddress;
+    }
+
+    fun setTranferAmount(amount: Int) {
+        self.myjettonTransferAmount = amount;
+    }
 
     init(jettonWalletCode: Cell, jettonMasterAddress: Address) {
         self.myJettonWalletAddress = calculateJettonWalletAddress (
         myAddress(),
         jettonMasterAddress,
-        jettonWalletCode
+        jettonWalletCode,
         );
     }
 
-
-
-    fun contractAddress(codeAndDataOfContract: StateInit): Address {
-        return self.myJettonWalletAddress;
-    }
-    fun myAddress(): Address {
-        return self.myJettonWalletAddress;
-    }
-    fun sendTon(reciepient: Address, amount: Int): Int {
-        return self.myTonBalance
-    }
-    fun sendUsdt(myJettonAddress: Address, transferNotification: JettonTransferNotification, tranferFee: Int, payLoad: Slice): Int {
-        return self.myUsdtBalance;
+    receive (msg: JattonReceiveNotification) {
+        require (
+        msg.sender == self.myJettonWalletAddress,
+        "Not From Your Jetton Wallet"
+        );
+        self.myjettonTransferAmount += msg.amount;
+        self.sendJetton(msg.sender, msg.amount);
     }
 
-    fun calculateJettonWalletAddress(
-        ownerAddress: Address,
-        jettonMasterAddress: Address,
-        jettonWalletCode: Cell
-    ): Address {
-
-      let initData = JettonWalletData {
-            balance: 0,
-            ownerAddress,
-            jettonMasterAddress,
-            jettonWalletCode
+    fun sendJetton(recipient: Address, amount: Int) {
+        let transferParams = JettonTransfer {
+        queryId: 42,
+        amount,
+        destination: recipient,
+        responseDestination: recipient,
+        customPayload: null,
+        forwardTonAmount: 0,
+        forwardPayload: rawSlice("F")
         };
-
-        return contractAddress (StateInit{
-            code: jettonWalletCode,
-            data: initData.toCell(),
+        send(SendParameters{
+        to: self.myJettonWalletAddress,
+        value: ton("0.05"),
+        body: transferParams.toCell()
         });
-
-    }
-
-    fun calculateUsdtWalletAddress (
-        ownerAddress: Address,
-        jettonMasterAddress: Address,
-        jettonWalletCode: Cell
-    ): Address {
-        let initData = UsdtWalletData {
-            status: 0,
-            balance: 0,
-            ownerAddress,
-            jettonMasterAddress,
-        };
-        return contractAddress(StateInit{
-            code: jettonWalletCode,
-            data: initData.toCell()
-        });
-    }
-
-
-    receive(msg: JettonTransferNotification) {
-        require (
-            myAddress() == self.myJettonWalletAddress,
-            "Transfer Is Not From Your Jetton Wallet"
-        );
-        self.myUsdtBalance += msg.amount;
-    }
-
-    fun withdrawTon(amount: Int, reciepient: Address ) {
-        require (
-            amount > 0,
-            "Amount Must Be Greater Than 1"
-        );
-        require(
-            self.myTonBalance >= amount,
-            "Insufficient Ton Balance"
-        );
-        self.myTonBalance -= amount;
-        sendTon(reciepient, amount);
-    }
-
-    fun withdrawUsdt(amount: Int, reciepient: Address) {
-        require (
-            amount > 0,
-            "Amount Must Be Greater Than 0"
-        );
-        require (
-            self.myUsdtBalance > amount,
-            "Insufficient Usdt Balance"
-        );
-        self.myUsdtBalance -= amount;
-        sendUsdt (
-            self.myJettonWalletAddress,
-            JettonTransferNotification{
-            queryId: 0,
-            amount,
-            sender: myAddress(),
-        },
-        usdtTransferGasFee
-        );
     }
 
 
@@ -152,6 +99,56 @@ contract CryptoWallet with Deployable {
 
 
 }
+
+
+
+
+
+
+
+
+
+
+
+//    fun withdrawTon(amount: Int, reciepient: Address ) {
+//        require (
+//            amount > 0,
+//            "Amount Must Be Greater Than 1"
+//        );
+//        require(
+//            self.myTonBalance >= amount,
+//            "Insufficient Ton Balance"
+//        );
+//        self.myTonBalance -= amount;
+//        sendTon(reciepient, amount);
+//    }
+//
+//    fun withdrawUsdt(amount: Int, reciepient: Address) {
+//        require (
+//            amount > 0,
+//            "Amount Must Be Greater Than 0"
+//        );
+//        require (
+//            self.myUsdtBalance > amount,
+//            "Insufficient Usdt Balance"
+//        );
+//        self.myUsdtBalance -= amount;
+//        sendUsdt (
+//            self.myJettonWalletAddress,
+//            TonTransferNotification{
+//            queryId: 0,
+//            amount,
+//            sender: myAddress(),
+//        },
+//        usdtTransferGasFee
+//        );
+//   }
+
+
+
+
+
+
 
 
 
