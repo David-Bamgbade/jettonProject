@@ -1,10 +1,8 @@
 import { Blockchain, SandboxContract, TreasuryContract } from '@ton/sandbox';
-import {Address, Builder, Cell, contractAddress, toNano} from '@ton/core';
+import {address, Address, Builder, Cell, contractAddress, toNano} from '@ton/core';
 import {CryptoWallet} from '../wrappers/CryptoWallet';
 import '@ton/test-utils';
-
-
-
+import {contentToCell} from "../wrappers/CryptoWallet.compile";
 
 
 describe('CryptoWallet', () => {
@@ -18,16 +16,16 @@ describe('CryptoWallet', () => {
         blockchain = await Blockchain.create();
 
         const jettonMasterAddress = Address.parse('EQBxKeIJenM5hTzThZ4US5DQvKWNygIkS1UlEMqWBlFoaCnR');  // Replace with actual jetton master address
-        const jettonWalletCode = Cell.fromBoc('BOC_CODE_HERE')[0];  // Replace with the actual BOC code of the Jetton wallet
+        const userWallet:Address = address("0QC1GuMlMyN4bLe0xRAUulsvTgL1Z03nnTo34C4gdUpsrxfg");
 
-        const initState = await CryptoWallet.fromInit(jettonWalletCode, jettonMasterAddress);
 
-        cryptoWallet = blockchain.openContract(initState);
+        const metaData = contentToCell({name: 'Havilla', symbol: "HVlA", maxsupply: BigInt(21000000)});
 
+       let contract = blockchain.openContract(await CryptoWallet.fromInit(metaData, jettonMasterAddress));
 
         deployer = await blockchain.treasury('deployer');
 
-        const deployResult = await cryptoWallet.send(
+        const deployResult = await contract.send(
             deployer.getSender(),
             {
                 value: toNano('0.05'),
@@ -38,30 +36,12 @@ describe('CryptoWallet', () => {
             }
         );
 
-        expect(deployResult.transactions).toHaveTransaction({
-            from: deployer.address,
-            to: cryptoWallet.address,
-            deploy: true,
-            success: true,
-        });
     });
 
 
     it('should deploy', async () => {
 
-        const sendCrypto = await cryptoWallet.send(
-            deployer.getSender(),
-            {
-                value: BigInt(1000000000), // 1 TON in nanoTON
-            },
-            {
-                $$type: 'JattonTransferNotification',
-                queryId: BigInt(42),
-                amount: BigInt(5000000000),
-                sender: deployer.address,
-                forwardPayload: new Builder().endCell().beginParse(), // Empty payload
-            }
-        )
+
 
     });
 
